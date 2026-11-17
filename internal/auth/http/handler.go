@@ -39,7 +39,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/refresh", h.refresh)
 	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
 
-	protected := RequireAuth(h.auth)
+	protected := httpx.RequireAuth(h.auth.VerifyAccessToken)
 	mux.Handle("POST /api/v1/auth/switch-facility", protected(http.HandlerFunc(h.switchFacility)))
 	mux.Handle("GET /api/v1/me", protected(http.HandlerFunc(h.me)))
 }

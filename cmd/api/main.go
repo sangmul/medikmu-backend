@@ -14,6 +14,10 @@ import (
 	authhttp "github.com/sangmul/medikmu-backend/internal/auth/http"
 	authservice "github.com/sangmul/medikmu-backend/internal/auth/service"
 	authstore "github.com/sangmul/medikmu-backend/internal/auth/store"
+	patientshttp "github.com/sangmul/medikmu-backend/internal/patients/http"
+	patientsservice "github.com/sangmul/medikmu-backend/internal/patients/service"
+	patientsstore "github.com/sangmul/medikmu-backend/internal/patients/store"
+	"github.com/sangmul/medikmu-backend/internal/platform/audit"
 	"github.com/sangmul/medikmu-backend/internal/platform/config"
 	"github.com/sangmul/medikmu-backend/internal/platform/db"
 	"github.com/sangmul/medikmu-backend/internal/platform/httpx"
@@ -55,8 +59,14 @@ func run() error {
 	}
 
 	srv := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           httpx.NewRouter(cfg, authhttp.New(authSvc).Mount),
+		Addr: cfg.HTTPAddr,
+		Handler: httpx.NewRouter(cfg,
+			authhttp.New(authSvc).Mount,
+			patientshttp.New(
+				patientsservice.New(patientsstore.New(pool), audit.NewPostgres(pool)),
+				authSvc.VerifyAccessToken,
+			).Mount,
+		),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,
