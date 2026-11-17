@@ -35,7 +35,9 @@ Each module: `domain/` → `service/` → `store/` → `http/`. Modules talk thr
 
 ## Auth
 
-- Email/phone + password; short-lived access JWT (15 min) + rotating refresh token stored hashed in the database.
+- Email + password (argon2id); short-lived access JWT (HS256, 15 min) + rotating opaque refresh token (30 days) stored as a SHA-256 hash.
+- Implemented in `internal/auth`; other modules protect routes with `authhttp.RequireAuth` / `RequireFacility(roles...)` and read the caller via `authctx.From(ctx)`.
+- Login activates the facility automatically only if the user belongs to exactly one; otherwise the client calls `POST /auth/switch-facility`.
 - RBAC by role per facility. Authorization lives in services.
 - Refresh token reuse detection: revoke the whole token family.
 

@@ -4,7 +4,7 @@ Go API for the Medikmu platform: the mobile app (patients) and the web app (doct
 
 ## Quick start
 
-Requires Docker and Go 1.24+.
+Requires Docker and Go 1.26+.
 
 ```bash
 make up          # API on http://localhost:8080 with hot reload
