@@ -1,21 +1,18 @@
-package authhttp
+package httpx
 
 import (
 	"net/http"
 	"strings"
 
 	"github.com/sangmul/medikmu-backend/internal/platform/authctx"
-	"github.com/sangmul/medikmu-backend/internal/platform/httpx"
 )
 
-// Verifier validates an access token. *service.Service satisfies it.
-type Verifier interface {
-	VerifyAccessToken(token string) (authctx.Principal, error)
-}
+// TokenVerifier validates an access token and returns the caller.
+type TokenVerifier func(token string) (authctx.Principal, error)
 
 // RequireAuth rejects requests without a valid Bearer access token and stores the caller in the
-// request context (see authctx.From). Other modules use it to protect their routes.
-func RequireAuth(v Verifier) func(http.Handler) http.Handler {
+// request context (see authctx.From). Every module uses it to protect its routes.
+func RequireAuth(verify TokenVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token, ok := bearerToken(r)
@@ -23,7 +20,7 @@ func RequireAuth(v Verifier) func(http.Handler) http.Handler {
 				unauthorized(w)
 				return
 			}
-			p, err := v.VerifyAccessToken(token)
+			p, err := verify(token)
 			if err != nil {
 				unauthorized(w)
 				return
@@ -34,7 +31,7 @@ func RequireAuth(v Verifier) func(http.Handler) http.Handler {
 }
 
 // RequireFacility additionally requires an active facility, optionally restricted to the given roles.
-// Use it after RequireAuth on staff-only routes.
+// Use it after RequireAuth on staff-only routes. Services still re-check authorization themselves.
 func RequireFacility(roles ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,7 +41,7 @@ func RequireFacility(roles ...string) func(http.Handler) http.Handler {
 				return
 			}
 			if !p.HasFacility() || (len(roles) > 0 && !contains(roles, p.Role)) {
-				httpx.Error(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses.")
+				Error(w, http.StatusForbidden, "forbidden", "Anda tidak memiliki akses.")
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -62,7 +59,7 @@ func bearerToken(r *http.Request) (string, bool) {
 
 func unauthorized(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", `Bearer realm="medikmu"`)
-	httpx.Error(w, http.StatusUnauthorized, "unauthorized", "Silakan masuk terlebih dahulu.")
+	Error(w, http.StatusUnauthorized, "unauthorized", "Silakan masuk terlebih dahulu.")
 }
 
 func contains(list []string, s string) bool {

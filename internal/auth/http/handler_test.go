@@ -34,7 +34,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	h := authhttp.New(svc)
-	staffOnly := authhttp.RequireAuth(svc)(authhttp.RequireFacility(domain.RoleDoctor)(
+	staffOnly := httpx.RequireAuth(svc.VerifyAccessToken)(httpx.RequireFacility(domain.RoleDoctor)(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			p, _ := authctx.From(r.Context())
 			httpx.JSON(w, http.StatusOK, map[string]string{"facility": p.FacilityID})

@@ -153,6 +153,10 @@ paths:
       tags: [patients]
       operationId: listPatients
       summary: List patients of the active facility (web)
+      description: |
+        Newest first, cursor-paginated. NIK is masked and clinical fields are omitted in the list;
+        fetch one patient for the full record. Requires an active facility (any staff role).
+        Every call is audited.
       security:
         - bearerAuth: []
       parameters:
@@ -176,6 +180,118 @@ paths:
         "401":
           $ref: "#/components/responses/Error"
         "403":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [patients]
+      operationId: createPatient
+      summary: Register a patient at the active facility
+      description: |
+        Roles: admin, doctor, nurse, staff. `consent` must be true. The MRN (`RM-000001`, per facility)
+        is assigned by the server. Patients under 18 need `guardian_name`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientCreateRequest"
+      responses:
+        "201":
+          description: Created. `Location` points to the new patient.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: NIK already registered at this facility (`nik_taken`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: Validation failed; `error.details` maps field name to reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /patients/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [patients]
+      operationId: getPatient
+      summary: Full patient record
+      description: Any staff role of the facility. Audited. A patient of another facility returns 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The patient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [patients]
+      operationId: updatePatient
+      summary: Replace the editable fields of a patient
+      description: |
+        Roles: admin, doctor, nurse, staff. Full replacement of the fields below; `consent`, MRN and
+        facility cannot be changed (unknown fields are rejected with 400).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientInput"
+      responses:
+        "200":
+          description: Updated patient
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [patients]
+      operationId: archivePatient
+      summary: Archive a patient (admin only)
+      description: Hides the patient from active lists; the record is kept. Its NIK can be registered again.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Archived
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
 components:
   securitySchemes:
@@ -260,15 +376,67 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Membership"
-    Patient:
+    PatientInput:
       type: object
-      required: [id, full_name]
+      required: [full_name, sex, birth_date, phone, payment_type]
+      properties:
+        full_name: { type: string, minLength: 3, maxLength: 120 }
+        sex: { type: string, enum: [F, M] }
+        birth_date: { type: string, format: date }
+        birth_place: { type: string, maxLength: 80 }
+        nik: { type: string, description: 16 digits; spaces and dashes are ignored. Optional. }
+        guardian_name: { type: string, description: Required for patients under 18 }
+        guardian_relation: { type: string, maxLength: 40 }
+        phone: { type: string, description: 9-15 digits; a leading + is kept }
+        email: { type: string, format: email }
+        address: { type: string, maxLength: 300 }
+        payment_type: { type: string, enum: [bpjs, private, insurance] }
+        bpjs_number: { type: string, description: 13 digits; only with payment_type bpjs }
+        allergies:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 60 }
+        conditions:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 60 }
+        notes: { type: string, maxLength: 2000 }
+    PatientCreateRequest:
+      allOf:
+        - $ref: "#/components/schemas/PatientInput"
+        - type: object
+          required: [consent]
+          properties:
+            consent:
+              type: boolean
+              description: Patient or guardian consent to store the record. Must be true.
+    Patient:
+      allOf:
+        - $ref: "#/components/schemas/PatientInput"
+        - type: object
+          required: [id, mrn, consent_at, created_at, updated_at]
+          properties:
+            id: { type: string, format: uuid }
+            mrn: { type: string, example: RM-000001 }
+            consent_at: { type: string, format: date-time }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    PatientSummary:
+      type: object
+      required: [id, mrn, full_name, sex, birth_date, phone, payment_type, allergies]
       properties:
         id: { type: string, format: uuid }
+        mrn: { type: string }
         full_name: { type: string }
-        medical_record_no: { type: string }
+        sex: { type: string, enum: [F, M] }
         birth_date: { type: string, format: date }
+        nik_masked: { type: string, example: 3174 **** **** 8901 }
+        guardian_name: { type: string }
         phone: { type: string }
+        payment_type: { type: string, enum: [bpjs, private, insurance] }
+        allergies:
+          type: array
+          items: { type: string }
     PatientPage:
       type: object
       required: [data]
@@ -276,7 +444,7 @@ components:
         data:
           type: array
           items:
-            $ref: "#/components/schemas/Patient"
+            $ref: "#/components/schemas/PatientSummary"
         next_cursor:
           type: string
           nullable: true
