@@ -36,10 +36,15 @@ Health data: treat every change as security-sensitive. Read `docs/architecture.m
 - Idiomatic Go, `gofmt`/`goimports`, wrap errors with `%w`, pass `context.Context` first, no globals.
 - Table-driven tests. Unit-test services with fakes; test stores against a real Postgres (docker), not mocks.
 - Small PRs. Conventional commit prefixes: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
+- Git workflow details are in the Git section below.
 
 ## Git
-- Branch from `main`; never push to `main` directly; open a PR.
-- Commit identity for this repo is the personal account (see global git config). Do not change git config.
+- **`develop` is the default and integration branch.** `main` holds released code only.
+- Branch from `develop` as `feat/<topic>`, `fix/<topic>`, `chore/<topic>`, `docs/<topic>`; open a PR **into `develop`**.
+- `main` is updated only by a release PR from `develop` (or a `hotfix/<topic>` PR, which is then merged back into `develop`).
+- Never push directly to `develop` or `main`, never force-push, never rewrite shared history. Squash-merge PRs.
+- CI (`.github/workflows/ci.yml`) must pass before merge.
+- Remote is SSH (`git@github.com:sangmul/medikmu-backend.git`). Commit identity is the personal account (see global git config); do not change git config.
 
 ## Documentation
 - Update `docs/` when behavior or architecture changes. Record significant decisions as an ADR in `docs/adr/`.
