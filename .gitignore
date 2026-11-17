@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+/bin/
+/tmp/
+
+# Go
+*.test
+*.out
+coverage.*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code: worktrees and local settings are per-developer
+.claude/worktrees/
+.claude/settings.local.json

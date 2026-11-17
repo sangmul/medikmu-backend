@@ -1,0 +1,9 @@
+.git
+.claude
+.env
+.env.*
+docs
+deploy
+bin
+tmp
+*.md

@@ -1,0 +1,181 @@
+openapi: 3.0.3
+info:
+  title: Medikmu API
+  version: 0.1.0
+  description: |
+    Backend for the Medikmu mobile app (patients) and web app (doctors, clinics, hospitals).
+    This file is the source of truth: change it first, then implement. See docs/api-conventions.md.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+tags:
+  - name: auth
+  - name: me
+  - name: patients
+paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Sign in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          $ref: "#/components/responses/Error"
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshToken
+      summary: Exchange a refresh token for a new token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: New tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          $ref: "#/components/responses/Error"
+  /me:
+    get:
+      tags: [me]
+      operationId: getMe
+      summary: Current user and memberships
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        "401":
+          $ref: "#/components/responses/Error"
+  /patients:
+    get:
+      tags: [patients]
+      operationId: listPatients
+      summary: List patients of the active facility (web)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          description: Search by name, phone or medical record number
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: A page of patients
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientPage"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: invalid_credentials }
+            message: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, expires_in]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_in: { type: integer, description: Access token lifetime in seconds }
+    Membership:
+      type: object
+      required: [facility_id, role]
+      properties:
+        facility_id: { type: string, format: uuid }
+        role:
+          type: string
+          enum: [admin, doctor, nurse, pharmacist, finance, staff]
+    Me:
+      type: object
+      required: [id, email, full_name, memberships]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        full_name: { type: string }
+        memberships:
+          type: array
+          items:
+            $ref: "#/components/schemas/Membership"
+    Patient:
+      type: object
+      required: [id, full_name]
+      properties:
+        id: { type: string, format: uuid }
+        full_name: { type: string }
+        medical_record_no: { type: string }
+        birth_date: { type: string, format: date }
+        phone: { type: string }
+    PatientPage:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Patient"
+        next_cursor:
+          type: string
+          nullable: true
