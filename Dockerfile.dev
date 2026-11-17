@@ -1,5 +1,5 @@
 # Development image: hot reload with air. Not used in production.
-FROM golang:1.24-alpine
+FROM golang:1.26-alpine
 RUN go install github.com/air-verse/air@v1.61.7
 WORKDIR /app
 COPY go.mod go.sum* ./

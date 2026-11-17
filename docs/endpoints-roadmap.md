@@ -3,8 +3,8 @@
 All under `/api/v1`. Status: ☐ todo, ☑ in `api/openapi.yaml`. Derived from `medikmu-web` and `medikmu_mobile`.
 
 ## Phase 1 — Foundation
-- ☑ `POST /auth/login`, `POST /auth/refresh`, ☑ `GET /me`
-- ☐ `POST /auth/register`, `/auth/logout`, `/auth/forgot-password`, `/auth/verify-otp`, `/auth/switch-facility`
+- ☑ `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/switch-facility`, `GET /me` (implemented: `internal/auth`)
+- ☐ `POST /auth/forgot-password`, `/auth/verify-otp` (need an email/SMS/WhatsApp provider), login rate limiting (Redis), invite acceptance (staff onboarding)
 - ☐ `POST /files` (signed upload), `GET /files/{id}`
 - ☐ `POST /devices` (FCM token), `GET /notifications`
 - ☐ `GET|PUT /facilities/current`, `/team`, `/invites`

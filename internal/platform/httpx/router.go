@@ -3,6 +3,7 @@ package httpx
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,17 +11,42 @@ import (
 	"github.com/sangmul/medikmu-backend/internal/platform/config"
 )
 
-// NewRouter builds the root handler. Feature modules mount their routes under /api/v1.
-func NewRouter(_ config.Config) http.Handler {
+// Mount registers a module's routes on the mux. Patterns carry the full path, e.g. "POST /api/v1/auth/login".
+type Mount func(mux *http.ServeMux)
+
+// NewRouter builds the root handler and mounts each module's routes.
+func NewRouter(_ config.Config, mounts ...Mount) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-
-	// TODO(modules): mount module routes, e.g. auth.Routes(mux), patients.Routes(mux).
+	for _, m := range mounts {
+		m(mux)
+	}
 
 	return chain(mux, recoverer, requestLogger)
+}
+
+// maxBodyBytes caps JSON request bodies.
+const maxBodyBytes = 1 << 20 // 1 MiB
+
+// DecodeJSON reads a single JSON object into dst. Unknown fields and trailing data are rejected.
+func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+	if dec.More() {
+		return errors.New("unexpected data after JSON body")
+	}
+	return nil
+}
+
+// ErrorDetails is like Error but includes machine-readable details (e.g. per-field validation errors).
+func ErrorDetails(w http.ResponseWriter, status int, code, message string, details any) {
+	JSON(w, status, map[string]any{"error": map[string]any{"code": code, "message": message, "details": details}})
 }
 
 // JSON writes v as a JSON response.

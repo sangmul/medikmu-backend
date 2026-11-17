@@ -39,7 +39,7 @@ DigitalOcean / Vultr / Hetzner Singapore-region offerings where available. Get l
 3. Copy `deploy/docker-compose.prod.yml`, `deploy/Caddyfile`, `deploy/backup.sh` to `/opt/medikmu/`.
 4. Create `/opt/medikmu/.env.prod` with `API_DOMAIN`, `API_IMAGE`, `POSTGRES_PASSWORD`, `JWT_SECRET` (`openssl rand -hex 32`). Never commit it.
 5. `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d`
-6. Run migrations, set up the backup cron, and **do a test restore** before real data arrives.
+6. Run migrations (e.g. `docker run --rm --network <compose_network> -v /opt/medikmu/migrations:/migrations migrate/migrate -path /migrations -database "$DATABASE_URL" up`), set up the backup cron, and **do a test restore** before real data arrives.
 
 ## CI/CD (next step)
 GitHub Actions builds the image on `main`, pushes it to GHCR, then SSHes to the VPS to `docker compose pull && up -d`.

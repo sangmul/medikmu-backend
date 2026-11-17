@@ -13,11 +13,90 @@ tags:
   - name: me
   - name: patients
 paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      operationId: register
+      summary: Create a patient account and sign in
+      description: |
+        Creates a user (a patient by default) and returns tokens. Staff are attached to facilities
+        through invites, not through this endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "409":
+          description: Email or phone already registered (`email_taken`, `phone_taken`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: Validation failed; `error.details` maps field name to reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the session the refresh token belongs to
+      description: Idempotent. Unknown tokens are ignored.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "204":
+          description: Signed out
+  /auth/switch-facility:
+    post:
+      tags: [auth]
+      operationId: switchFacility
+      summary: Change the active facility of the session
+      description: |
+        Rotates the refresh token and returns tokens scoped to the chosen facility.
+        An empty `facility_id` switches to the personal (patient) context.
+        A rejected switch (403) does not consume the refresh token.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SwitchFacilityRequest"
+      responses:
+        "200":
+          description: New tokens
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenPair"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
   /auth/login:
     post:
       tags: [auth]
       operationId: login
       summary: Sign in with email and password
+      description: |
+        If the user belongs to exactly one facility it becomes the active facility;
+        otherwise call `/auth/switch-facility`. Wrong password and unknown email return the same error.
       requestBody:
         required: true
         content:
@@ -122,17 +201,38 @@ components:
           properties:
             code: { type: string, example: invalid_credentials }
             message: { type: string }
+            details:
+              type: object
+              additionalProperties: { type: string }
+              description: Present on validation errors (field name to reason)
     LoginRequest:
       type: object
       required: [email, password]
       properties:
         email: { type: string, format: email }
         password: { type: string, minLength: 8 }
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name]
+      properties:
+        email: { type: string, format: email }
+        phone: { type: string }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        full_name: { type: string, maxLength: 120 }
     RefreshRequest:
       type: object
       required: [refresh_token]
       properties:
         refresh_token: { type: string }
+    SwitchFacilityRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+        facility_id:
+          type: string
+          format: uuid
+          description: Omit or leave empty for the personal (patient) context
     TokenPair:
       type: object
       required: [access_token, refresh_token, expires_in]
@@ -154,6 +254,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
+        phone: { type: string }
         full_name: { type: string }
         memberships:
           type: array
