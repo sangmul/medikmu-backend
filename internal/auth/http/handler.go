@@ -21,6 +21,7 @@ type Auth interface {
 	Logout(ctx context.Context, refreshToken string) error
 	SwitchFacility(ctx context.Context, userID, refreshToken, facilityID string) (domain.TokenPair, error)
 	Me(ctx context.Context, userID string) (domain.Me, error)
+	UpdateProfile(ctx context.Context, userID, fullName, phone string) (domain.User, error)
 	VerifyAccessToken(token string) (authctx.Principal, error)
 }
 
@@ -63,6 +64,7 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	protected := httpx.RequireAuth(h.auth.VerifyAccessToken)
 	mux.Handle("POST /api/v1/auth/switch-facility", protected(http.HandlerFunc(h.switchFacility)))
 	mux.Handle("GET /api/v1/me", protected(http.HandlerFunc(h.me)))
+	mux.Handle("PUT /api/v1/me/profile", protected(http.HandlerFunc(h.updateProfile)))
 }
 
 // --- request / response bodies (mirror api/openapi.yaml) ---
@@ -100,11 +102,17 @@ type membershipResponse struct {
 }
 
 type meResponse struct {
-	ID          string               `json:"id"`
-	Email       string               `json:"email"`
-	Phone       string               `json:"phone,omitempty"`
-	FullName    string               `json:"full_name"`
-	Memberships []membershipResponse `json:"memberships"`
+	ID            string               `json:"id"`
+	Email         string               `json:"email"`
+	Phone         string               `json:"phone,omitempty"`
+	PhoneVerified bool                 `json:"phone_verified"`
+	FullName      string               `json:"full_name"`
+	Memberships   []membershipResponse `json:"memberships"`
+}
+
+type profileRequest struct {
+	FullName string `json:"full_name"`
+	Phone    string `json:"phone"` // empty clears it
 }
 
 // --- handlers ---
@@ -183,8 +191,31 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
+	writeMe(w, me)
+}
+
+func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request) {
+	p, _ := authctx.From(r.Context())
+	var req profileRequest
+	if !decode(w, r, &req) {
+		return
+	}
+	if _, err := h.auth.UpdateProfile(r.Context(), p.UserID, req.FullName, req.Phone); err != nil {
+		writeError(w, r, err)
+		return
+	}
+	me, err := h.auth.Me(r.Context(), p.UserID)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	writeMe(w, me)
+}
+
+func writeMe(w http.ResponseWriter, me domain.Me) {
 	resp := meResponse{
-		ID: me.User.ID, Email: me.User.Email, Phone: me.User.Phone, FullName: me.User.FullName,
+		ID: me.User.ID, Email: me.User.Email, Phone: me.User.Phone, PhoneVerified: me.User.PhoneVerified,
+		FullName:    me.User.FullName,
 		Memberships: make([]membershipResponse, 0, len(me.Memberships)),
 	}
 	for _, m := range me.Memberships {

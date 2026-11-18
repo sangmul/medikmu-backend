@@ -102,6 +102,42 @@ func TestUsers(t *testing.T) {
 	}
 }
 
+func TestUpdateProfile(t *testing.T) {
+	st, pool := newStore(t)
+	ctx := context.Background()
+	a, _ := st.CreateUser(ctx, domain.User{Email: "a@example.com", PasswordHash: "h", FullName: "A"})
+	b, _ := st.CreateUser(ctx, domain.User{Email: "b@example.com", PasswordHash: "h", FullName: "B"})
+
+	got, err := st.UpdateProfile(ctx, a.ID, "Budi", "0812")
+	if err != nil || got.FullName != "Budi" || got.Phone != "0812" || got.PhoneVerified {
+		t.Fatalf("update: %v %+v", err, got)
+	}
+	if _, err := st.UpdateProfile(ctx, b.ID, "Siti", "0812"); !errors.Is(err, domain.ErrPhoneTaken) {
+		t.Fatalf("duplicate phone: want ErrPhoneTaken, got %v", err)
+	}
+	// Clearing the phone frees it, and two accounts without a phone do not collide.
+	if got, err := st.UpdateProfile(ctx, a.ID, "Budi", ""); err != nil || got.Phone != "" {
+		t.Fatalf("clear: %v %+v", err, got)
+	}
+	if _, err := st.UpdateProfile(ctx, b.ID, "Siti", "0812"); err != nil {
+		t.Fatalf("phone should be free after it was cleared: %v", err)
+	}
+	if _, err := st.UpdateProfile(ctx, "00000000-0000-4000-8000-000000000000", "X", ""); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("unknown user: want ErrNotFound, got %v", err)
+	}
+
+	// Verification belongs to a specific number: it survives a no-op save and resets when the number changes.
+	if _, err := pool.Exec(ctx, `UPDATE users SET phone_verified_at = now() WHERE id = $1`, b.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := st.UpdateProfile(ctx, b.ID, "Siti Baru", "0812"); !got.PhoneVerified {
+		t.Fatal("saving the same number must keep it verified")
+	}
+	if got, _ := st.UpdateProfile(ctx, b.ID, "Siti Baru", "0899"); got.PhoneVerified {
+		t.Fatal("changing the number must reset verification")
+	}
+}
+
 func TestMemberships(t *testing.T) {
 	st, pool := newStore(t)
 	ctx := context.Background()

@@ -22,8 +22,10 @@ All under `/api/v1`. Status: ☐ todo, ☑ in `api/openapi.yaml`. Derived from `
 - ☐ Labs: `GET|POST /lab-orders`, `GET /lab-results/{id}`, report PDF
 
 ## Phase 3 — Patient app
-- ☐ `/me/profile`, `/me/records`, `/me/lab-results`, `/me/prescriptions`, `/me/vitals`, `/me/medications`
-- ☐ `/family-members` (CRUD)
+- ☑ `PUT /me/profile` (name, phone; `phone_verified` stays false until OTP exists)
+- ☑ Family members (implemented: `internal/family`): `GET|POST /family-members`, `GET|PUT|DELETE /family-members/{id}`, `PUT /family-members/{id}/nik`
+- ☐ `/me/records`, `/me/lab-results`, `/me/prescriptions`, `/me/vitals`, `/me/medications` (need the records, labs and prescriptions modules)
+- ☐ Link a family member to a facility's patient record (`patients.user_id` is ready), BPJS card active status (needs BPJS integration)
 - ☐ KIA: `/kia/growth`, `/kia/immunizations`, `/kia/antenatal`
 - ☐ Chat: `/conversations`, `/conversations/{id}/messages`, WebSocket `/ws`
 - ☐ `GET /medicines`

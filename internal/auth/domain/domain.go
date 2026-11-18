@@ -20,12 +20,14 @@ const (
 
 // User is an account. A user is a patient by default and may also be staff of facilities.
 type User struct {
-	ID           string
-	Email        string
-	Phone        string // optional
-	PasswordHash string
-	FullName     string
-	CreatedAt    time.Time
+	ID    string
+	Email string
+	Phone string // optional
+	// PhoneVerified is true once the phone was confirmed by OTP (not built yet, so always false for now).
+	PhoneVerified bool
+	PasswordHash  string
+	FullName      string
+	CreatedAt     time.Time
 }
 
 // Membership links a user to a facility with a role.
@@ -82,6 +84,9 @@ type Store interface {
 	UserByEmail(ctx context.Context, email string) (User, error)
 	UserByID(ctx context.Context, id string) (User, error)
 	Memberships(ctx context.Context, userID string) ([]Membership, error)
+	// UpdateProfile sets name and phone ("" clears it). Changing the phone resets PhoneVerified.
+	// ErrPhoneTaken, ErrNotFound.
+	UpdateProfile(ctx context.Context, userID, fullName, phone string) (User, error)
 
 	InsertRefreshToken(ctx context.Context, t RefreshToken) error
 	RefreshTokenByHash(ctx context.Context, hash string) (RefreshToken, error)

@@ -265,6 +265,41 @@ func TestRefresh_AfterMembershipRemovedIsRefused(t *testing.T) {
 	}
 }
 
+func TestUpdateProfile(t *testing.T) {
+	svc, _ := newSvc(t)
+	ctx := context.Background()
+	a := register(t, svc, "a@example.com")
+	b := register(t, svc, "b@example.com")
+	pa, _ := svc.VerifyAccessToken(a.AccessToken)
+	pb, _ := svc.VerifyAccessToken(b.AccessToken)
+
+	u, err := svc.UpdateProfile(ctx, pa.UserID, "  Budi Santoso ", "0812-3456-7890")
+	if err != nil || u.FullName != "Budi Santoso" || u.Phone != "081234567890" || u.PhoneVerified {
+		t.Fatalf("update: %v %+v", err, u)
+	}
+	if u, _ := svc.UpdateProfile(ctx, pa.UserID, "Budi", "+62 812 3456 7890"); u.Phone != "+6281234567890" {
+		t.Fatalf("a leading + must be kept: %q", u.Phone)
+	}
+	if u, err := svc.UpdateProfile(ctx, pa.UserID, "Budi", ""); err != nil || u.Phone != "" {
+		t.Fatalf("empty phone clears it: %v %+v", err, u)
+	}
+
+	// Another account cannot take a phone number that is already in use.
+	if _, err := svc.UpdateProfile(ctx, pa.UserID, "Budi", "081234567890"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.UpdateProfile(ctx, pb.UserID, "Siti", "081234567890"); !errors.Is(err, domain.ErrPhoneTaken) {
+		t.Fatalf("want ErrPhoneTaken, got %v", err)
+	}
+
+	for name, in := range map[string][2]string{"blank name": {"  ", ""}, "short phone": {"Budi", "123"}, "long phone": {"Budi", "1234567890123456"}} {
+		var ve *domain.ValidationError
+		if _, err := svc.UpdateProfile(ctx, pa.UserID, in[0], in[1]); !errors.As(err, &ve) {
+			t.Errorf("%s: want ValidationError, got %v", name, err)
+		}
+	}
+}
+
 func TestVerifyAccessToken_Rejects(t *testing.T) {
 	svc, _ := newSvc(t)
 	pair := register(t, svc, "budi@example.com")

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS family_members;
+ALTER TABLE users DROP COLUMN IF EXISTS phone_verified_at;

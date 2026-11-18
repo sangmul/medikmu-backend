@@ -179,6 +179,36 @@ func (s *Service) Me(ctx context.Context, userID string) (domain.Me, error) {
 	return domain.Me{User: user, Memberships: memberships}, nil
 }
 
+// UpdateProfile changes the caller's display name and phone. An empty phone clears it; changing the phone
+// resets its verification.
+func (s *Service) UpdateProfile(ctx context.Context, userID, fullName, phone string) (domain.User, error) {
+	fields := map[string]string{}
+	name := strings.TrimSpace(fullName)
+	if name == "" || utf8.RuneCountInString(name) > 120 {
+		fields["full_name"] = "nama wajib diisi (maksimal 120 karakter)"
+	}
+	phone = strings.TrimSpace(phone)
+	if phone != "" {
+		digits := strings.Map(func(r rune) rune {
+			if r >= '0' && r <= '9' {
+				return r
+			}
+			return -1
+		}, phone)
+		if len(digits) < 9 || len(digits) > 15 {
+			fields["phone"] = "nomor telepon harus 9-15 digit"
+		} else if strings.HasPrefix(phone, "+") {
+			phone = "+" + digits
+		} else {
+			phone = digits
+		}
+	}
+	if len(fields) > 0 {
+		return domain.User{}, &domain.ValidationError{Fields: fields}
+	}
+	return s.store.UpdateProfile(ctx, userID, name, phone)
+}
+
 // consume validates a refresh token and marks it used. On reuse it revokes the family.
 func (s *Service) consume(ctx context.Context, token string, now time.Time) (domain.RefreshToken, error) {
 	if token == "" {
