@@ -18,7 +18,7 @@ up: .env ## Start API + Postgres + Redis (hot reload, auto-migrate)
 tunnel: .env ## Start the stack plus an ngrok tunnel (needs NGROK_AUTHTOKEN, NGROK_DOMAIN in .env)
 	@! grep -Eqi '^JWT_SECRET=(dev-only|change-me)' .env || { echo "JWT_SECRET in .env is the public placeholder. Run: openssl rand -hex 32, and put it in .env"; exit 1; }
 	@grep -Eq '^NGROK_AUTHTOKEN=.+' .env || { echo "Set NGROK_AUTHTOKEN in .env (see docs/dev-ngrok.md)"; exit 1; }
-	@grep -Eq '^NGROK_DOMAIN=.+' .env || { echo "Set NGROK_DOMAIN in .env (see docs/dev-ngrok.md)"; exit 1; }
+	@grep -Eq '^NGROK_DOMAIN=[^/:[:space:]]+$$' .env || { echo "Set NGROK_DOMAIN in .env to the bare domain, e.g. my-name.ngrok-free.app (no https://). See docs/dev-ngrok.md"; exit 1; }
 	docker compose --profile tunnel up --build
 
 down: ## Stop the local stack (and the tunnel, if running)

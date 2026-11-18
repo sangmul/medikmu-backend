@@ -35,7 +35,7 @@ services:
     profiles: ["tunnel"]
     image: ngrok/ngrok:3
     # Compose resolves ${...} even when this profile is off, so no `:?` here: `make tunnel` checks the values.
-    command: ["http", "api:8080", "--url=${NGROK_DOMAIN:-}"]
+    command: ["http", "api:8080", "--url=https://${NGROK_DOMAIN:-}"]
     environment:
       NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
     ports:
