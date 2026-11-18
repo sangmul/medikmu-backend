@@ -84,6 +84,36 @@ func TestRegister(t *testing.T) {
 	}
 }
 
+func TestRegister_PhoneIsValidatedAndNormalized(t *testing.T) {
+	svc, st := newSvc(t)
+	ctx := context.Background()
+
+	for _, bad := range []string{"abc", "123", "1234567890123456"} {
+		_, err := svc.Register(ctx, service.RegisterInput{Email: "x@example.com", Phone: bad, Password: "correct-horse", FullName: "X"})
+		var ve *domain.ValidationError
+		if !errors.As(err, &ve) || ve.Fields["phone"] == "" {
+			t.Errorf("phone %q: want validation error on phone, got %v", bad, err)
+		}
+	}
+	// Optional: no phone is fine.
+	if _, err := svc.Register(ctx, service.RegisterInput{Email: "nophone@example.com", Password: "correct-horse", FullName: "X"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.Register(ctx, service.RegisterInput{Email: "a@example.com", Phone: "0812-3456-7890", Password: "correct-horse", FullName: "A"}); err != nil {
+		t.Fatal(err)
+	}
+	u, _ := st.UserByEmail(ctx, "a@example.com")
+	if u.Phone != "081234567890" {
+		t.Fatalf("stored phone = %q, want digits only", u.Phone)
+	}
+	// The same number written differently is the same number.
+	_, err := svc.Register(ctx, service.RegisterInput{Email: "b@example.com", Phone: "0812 3456 7890", Password: "correct-horse", FullName: "B"})
+	if !errors.Is(err, domain.ErrPhoneTaken) {
+		t.Fatalf("same number in another format: want ErrPhoneTaken, got %v", err)
+	}
+}
+
 func TestRegister_DuplicateEmailIsCaseInsensitive(t *testing.T) {
 	svc, _ := newSvc(t)
 	register(t, svc, "budi@example.com")

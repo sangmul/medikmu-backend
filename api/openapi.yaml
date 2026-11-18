@@ -766,7 +766,7 @@ components:
       required: [email, password, full_name]
       properties:
         email: { type: string, format: email }
-        phone: { type: string }
+        phone: { type: string, description: Optional. 9-15 digits; normalized to digits, a leading + is kept }
         password: { type: string, minLength: 8, maxLength: 128 }
         full_name: { type: string, maxLength: 120 }
     RefreshRequest:

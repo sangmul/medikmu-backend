@@ -37,6 +37,7 @@ docs/                 architecture, deployment, conventions, ADRs
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Client guide (mobile and web)](docs/client-guide.md)
 - [API conventions](docs/api-conventions.md)
 - [Endpoint roadmap](docs/endpoints-roadmap.md)
 - [Development with ngrok](docs/dev-ngrok.md)
