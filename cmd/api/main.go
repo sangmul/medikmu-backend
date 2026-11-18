@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sangmul/medikmu-backend/api"
 	authhttp "github.com/sangmul/medikmu-backend/internal/auth/http"
 	authservice "github.com/sangmul/medikmu-backend/internal/auth/service"
 	authstore "github.com/sangmul/medikmu-backend/internal/auth/store"
@@ -58,15 +59,24 @@ func run() error {
 		return err
 	}
 
+	// Credential endpoints: 20 requests/minute per client IP on average, bursts of 10.
+	authLimiter := httpx.NewLimiter(20, 10)
+
+	mounts := []httpx.Mount{
+		httpx.Readyz(pool.Ping),
+		authhttp.New(authSvc, authhttp.WithRateLimit(authLimiter.Middleware(cfg.TrustProxy))).Mount,
+		patientshttp.New(
+			patientsservice.New(patientsstore.New(pool), audit.NewPostgres(pool)),
+			authSvc.VerifyAccessToken,
+		).Mount,
+	}
+	if cfg.Env != "production" {
+		mounts = append(mounts, api.Mount) // /docs and /openapi.yaml
+	}
+
 	srv := &http.Server{
-		Addr: cfg.HTTPAddr,
-		Handler: httpx.NewRouter(cfg,
-			authhttp.New(authSvc).Mount,
-			patientshttp.New(
-				patientsservice.New(patientsstore.New(pool), audit.NewPostgres(pool)),
-				authSvc.VerifyAccessToken,
-			).Mount,
-		),
+		Addr:              cfg.HTTPAddr,
+		Handler:           httpx.NewRouter(cfg, mounts...),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      30 * time.Second,

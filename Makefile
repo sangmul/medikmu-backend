@@ -1,4 +1,4 @@
-.PHONY: help up down logs run test lint fmt vet build migrate-up migrate-down migrate-new docker-build
+.PHONY: help up tunnel down logs run test lint fmt vet build migrate-up migrate-down migrate-new docker-build
 
 DB_URL ?= postgres://medikmu:medikmu@localhost:5432/medikmu?sslmode=disable
 
@@ -9,8 +9,14 @@ up: ## Start API + Postgres + Redis + MinIO (hot reload)
 	@test -f .env || cp .env.example .env
 	docker compose up --build
 
-down: ## Stop the local stack
-	docker compose down
+tunnel: ## Start the stack plus an ngrok tunnel (needs NGROK_AUTHTOKEN, NGROK_DOMAIN in .env)
+	@test -f .env || cp .env.example .env
+	@grep -Eq '^NGROK_AUTHTOKEN=.+' .env || { echo "Set NGROK_AUTHTOKEN in .env (see docs/dev-ngrok.md)"; exit 1; }
+	@grep -Eq '^NGROK_DOMAIN=.+' .env || { echo "Set NGROK_DOMAIN in .env (see docs/dev-ngrok.md)"; exit 1; }
+	docker compose --profile tunnel up --build
+
+down: ## Stop the local stack (and the tunnel, if running)
+	docker compose --profile tunnel down
 
 logs: ## Tail API logs
 	docker compose logs -f api

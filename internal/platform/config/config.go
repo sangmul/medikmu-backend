@@ -21,6 +21,12 @@ type Config struct {
 	JWTIssuer  string
 	AccessTTL  time.Duration
 	RefreshTTL time.Duration
+
+	// CORSAllowedOrigins are the exact browser origins (web app) allowed to call the API.
+	CORSAllowedOrigins []string
+	// TrustProxy makes rate limiting read the client IP from X-Forwarded-For. Enable only behind
+	// a proxy you control (ngrok, Caddy); otherwise clients could spoof their IP.
+	TrustProxy bool
 }
 
 // Load reads configuration from the environment and validates it.
@@ -45,6 +51,17 @@ func Load() (Config, error) {
 	if cfg.RefreshTTL, err = duration("REFRESH_TOKEN_TTL", "720h"); err != nil { // 30 days
 		return Config{}, err
 	}
+
+	for o := range strings.SplitSeq(get("CORS_ALLOWED_ORIGINS", ""), ",") {
+		if o = strings.TrimRight(strings.TrimSpace(o), "/"); o == "" {
+			continue
+		}
+		if o == "*" || !(strings.HasPrefix(o, "http://") || strings.HasPrefix(o, "https://")) {
+			return Config{}, fmt.Errorf("invalid CORS_ALLOWED_ORIGINS entry %q: use exact origins like https://app.example.com", o)
+		}
+		cfg.CORSAllowedOrigins = append(cfg.CORSAllowedOrigins, o)
+	}
+	cfg.TrustProxy = get("TRUST_PROXY", "false") == "true"
 
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

@@ -10,7 +10,7 @@ const goodSecret = "0123456789abcdef0123456789abcdef"
 
 func setEnv(t *testing.T, kv map[string]string) {
 	t.Helper()
-	for _, k := range []string{"DATABASE_URL", "JWT_SECRET", "ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "LOG_LEVEL"} {
+	for _, k := range []string{"DATABASE_URL", "JWT_SECRET", "ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "LOG_LEVEL", "CORS_ALLOWED_ORIGINS", "TRUST_PROXY"} {
 		t.Setenv(k, "")
 	}
 	for k, v := range kv {

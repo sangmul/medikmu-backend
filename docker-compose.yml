@@ -13,8 +13,35 @@ services:
     volumes:
       - .:/app
     depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Applies pending migrations on every `make up`, then exits.
+  migrate:
+    image: migrate/migrate:v4.18.1
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://medikmu:medikmu@db:5432/medikmu?sslmode=disable"
+      - "up"
+    volumes:
+      - ./migrations:/migrations:ro
+    depends_on:
       db:
         condition: service_healthy
+
+  # Public HTTPS URL for the mobile and web apps during development.
+  # Opt in with `make tunnel` (needs NGROK_AUTHTOKEN and NGROK_DOMAIN in .env). See docs/dev-ngrok.md.
+  ngrok:
+    profiles: ["tunnel"]
+    image: ngrok/ngrok:3
+    # Compose resolves ${...} even when this profile is off, so no `:?` here: `make tunnel` checks the values.
+    command: ["http", "api:8080", "--url=${NGROK_DOMAIN:-}"]
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    ports:
+      - "127.0.0.1:4040:4040" # ngrok inspector: replay and inspect requests
+    depends_on:
+      - api
 
   db:
     image: postgres:16-alpine

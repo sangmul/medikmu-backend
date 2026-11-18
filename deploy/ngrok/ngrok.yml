@@ -1,0 +1,18 @@
+# ngrok agent config for a dedicated device that exposes the dev API (see docs/dev-ngrok.md).
+#
+# One-time setup on that device:
+#   ngrok config add-authtoken <token>          # token stays out of git
+#   cp ngrok.yml ~/medikmu-ngrok.yml && edit `domain` and `addr`
+# Run:
+#   ngrok start medikmu-api --config "$HOME/Library/Application Support/ngrok/ngrok.yml" --config ~/medikmu-ngrok.yml
+#   (Linux: --config ~/.config/ngrok/ngrok.yml)
+#
+# `addr` is where the API listens from this device's point of view:
+#   - same machine as `make up`:            8080
+#   - API on another machine in the LAN:    192.168.1.20:8080
+version: "2"
+tunnels:
+  medikmu-api:
+    proto: http
+    addr: 8080
+    domain: your-name.ngrok-free.app # reserve a free static domain in the ngrok dashboard

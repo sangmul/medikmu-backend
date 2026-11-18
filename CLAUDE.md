@@ -4,7 +4,9 @@ Go API serving two clients: **medikmu_mobile** (Flutter, patients) and **medikmu
 Health data: treat every change as security-sensitive. Read `docs/architecture.md` before adding a module.
 
 ## Commands
-- `make up` — API + Postgres + Redis + MinIO with hot reload (needs Docker)
+- `make up` — API + Postgres + Redis + MinIO with hot reload (needs Docker); migrations run automatically
+- `make tunnel` — same plus an ngrok tunnel for the mobile/web apps (see `docs/dev-ngrok.md`). During development
+  the API is public through ngrok, so use fake data only
 - `make test` — `go test -race ./...` (run before every commit)
 - `make lint` — golangci-lint; `make fmt` — gofmt
 - `make migrate-up` / `make migrate-new name=<x>` — migrations (golang-migrate)

@@ -1,5 +1,8 @@
 # Deployment and cost
 
+> **Scope:** this document is about **production** hosting, which is not decided yet. During development the API is
+> exposed through ngrok: see [dev-ngrok.md](dev-ngrok.md) and [ADR 0004](adr/0004-dev-via-ngrok.md).
+
 Goal: the cheapest setup that is safe for health data, and easy to move later. Prices below are rough monthly
 estimates from memory; **check the providers' current pricing before buying.**
 
