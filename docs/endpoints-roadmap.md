@@ -13,6 +13,7 @@ All under `/api/v1`. Status: ☐ todo, ☑ in `api/openapi.yaml`. Derived from `
 ## Phase 2 — Core care
 - ☑ Patients (implemented: `internal/patients`): `GET|POST /patients`, `GET|PUT|DELETE /patients/{id}` (DELETE archives, admin only)
 - ☐ Patients later: link to a patient app account (`patients.user_id`), duplicate-person warning (name + birth date), merge, import
+- ☐ **Doctors, appointments and booking: design ready, needs decisions: [design/appointments.md](design/appointments.md)**
 - ☐ Doctors: `GET /doctors`, `/doctors/{id}`, `/doctors/{id}/slots`, `GET|PUT /schedules`
 - ☐ Appointments (web): `GET /appointments` (day/week/month), `POST`, `PATCH /{id}/status`
 - ☐ Booking (mobile): `POST /bookings`, `GET /bookings`, `PATCH /bookings/{id}/cancel`
