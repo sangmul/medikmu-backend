@@ -19,6 +19,17 @@ may need to integrate with **SatuSehat**. The web app already models these areas
 - Backups tested by restoring them, regularly.
 - Dependency and image scanning in CI (`govulncheck`, Dependabot).
 
+## Known limitations (accepted for now)
+- **Removed staff keep access for up to 15 minutes.** Access tokens are stateless JWTs: removing someone from a
+  facility stops them from refreshing (the membership is re-checked, covered by a test), but a token already issued
+  works until it expires (`ACCESS_TOKEN_TTL`, default 15m). If that window is too long for a customer, shorten the TTL
+  or add a per-request membership check (one indexed query) or a token deny-list in Redis.
+- **Rate limiting is in-memory and per process** (`httpx.Limiter`). Fine for one instance; use Redis before running several.
+- **Audit log is append-only by convention**, not enforced by the database. Add a trigger or restricted DB role before launch.
+- **Development runs through a public ngrok URL** ([ADR 0004](adr/0004-dev-via-ngrok.md)): fake data only.
+- **Admin actions are audited after the change is made**, not in the same transaction. If auditing fails the request
+  returns an error although the change was applied. Reads of patient data are fail-closed (no audit, no data).
+
 ## Privacy features to plan for
 - Patient consent records (`consent`), with purpose and timestamp.
 - Patient right of access and export of their own data.

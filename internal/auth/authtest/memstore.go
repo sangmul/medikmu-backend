@@ -40,6 +40,19 @@ func (m *MemStore) AddMembership(userID, facilityID, role string) {
 	m.memberships[userID] = append(m.memberships[userID], domain.Membership{FacilityID: facilityID, Role: role})
 }
 
+// RemoveMembership revokes a user's role in a facility (test setup helper).
+func (m *MemStore) RemoveMembership(userID, facilityID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	kept := m.memberships[userID][:0:0]
+	for _, ms := range m.memberships[userID] {
+		if ms.FacilityID != facilityID {
+			kept = append(kept, ms)
+		}
+	}
+	m.memberships[userID] = kept
+}
+
 // TokenCount returns the number of stored refresh tokens (test helper).
 func (m *MemStore) TokenCount() int {
 	m.mu.Lock()
