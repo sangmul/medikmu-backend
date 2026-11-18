@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -136,6 +137,55 @@ func TestLimiter_GCDropsIdleBuckets(t *testing.T) {
 	l.Allow("trigger-gc")
 	if len(l.buckets) != 1 {
 		t.Fatalf("idle buckets should be collected, have %d", len(l.buckets))
+	}
+}
+
+func TestLimiter_MemoryIsBounded(t *testing.T) {
+	l := NewLimiter(60, 2)
+	l.maxKeys = 50
+	now := time.Unix(1_000_000, 0)
+	l.now = func() time.Time { return now }
+	// An attacker forging a new client IP on every request must not grow memory without bound.
+	for i := range 10_000 {
+		l.Allow(fmt.Sprintf("10.%d.%d.%d", i/65536%256, i/256%256, i%256))
+	}
+	if len(l.buckets) > 50 {
+		t.Fatalf("tracked %d keys, cap is 50", len(l.buckets))
+	}
+	// And the limiter still works for a client that keeps coming back.
+	allowed := 0
+	for range 5 {
+		if ok, _ := l.Allow("203.0.113.9"); ok {
+			allowed++
+		}
+	}
+	if allowed < 1 || allowed > 2 {
+		t.Fatalf("burst of 2 expected for a steady client, got %d allowed", allowed)
+	}
+}
+
+func TestSecurityHeadersOnEveryResponse(t *testing.T) {
+	h := NewRouter(config.Config{CORSAllowedOrigins: []string{"https://web.example.com"}}, func(mux *http.ServeMux) {
+		mux.HandleFunc("GET /boom", func(http.ResponseWriter, *http.Request) { panic("boom") })
+	})
+	for name, req := range map[string]*http.Request{
+		"ok":        httptest.NewRequest("GET", "/healthz", nil),
+		"not found": httptest.NewRequest("GET", "/nope", nil),
+		"panic":     httptest.NewRequest("GET", "/boom", nil),
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("Referrer-Policy") != "no-referrer" {
+			t.Errorf("%s (%d): missing security headers: %v", name, rec.Code, rec.Header())
+		}
+	}
+	pre := httptest.NewRequest(http.MethodOptions, "/healthz", nil)
+	pre.Header.Set("Origin", "https://web.example.com")
+	pre.Header.Set("Access-Control-Request-Method", "GET")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, pre)
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Errorf("preflight response is missing nosniff: %v", rec.Header())
 	}
 }
 

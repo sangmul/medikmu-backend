@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/sangmul/medikmu-backend/internal/patients/domain"
@@ -17,6 +16,8 @@ import (
 const (
 	defaultLimit = 20
 	maxLimit     = 100
+	// maxQueryRunes caps the search text: it feeds ILIKE '%...%' patterns, so unbounded input is a cheap way to burn CPU.
+	maxQueryRunes = 100
 )
 
 var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
@@ -133,7 +134,7 @@ func (s *Service) List(ctx context.Context, who authctx.Principal, q string, cur
 	limit = min(limit, maxLimit)
 
 	rows, err := s.store.List(ctx, who.FacilityID, domain.ListFilter{
-		Query: strings.TrimSpace(q), Cursor: cursor, Limit: limit,
+		Query: clip(q, maxQueryRunes), Cursor: cursor, Limit: limit,
 	})
 	if err != nil {
 		return domain.Page{}, err

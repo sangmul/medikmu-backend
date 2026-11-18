@@ -19,7 +19,11 @@ type Limiter struct {
 	burst   float64
 	now     func() time.Time
 	lastGC  time.Time
+	maxKeys int // hard cap on tracked keys, so forged client IPs cannot grow memory without bound
 }
+
+// defaultMaxKeys bounds the limiter's memory (roughly tens of MB at the cap).
+const defaultMaxKeys = 100_000
 
 type bucket struct {
 	tokens float64
@@ -33,6 +37,7 @@ func NewLimiter(perMinute, burst int) *Limiter {
 		rate:    float64(perMinute) / 60,
 		burst:   float64(burst),
 		now:     time.Now,
+		maxKeys: defaultMaxKeys,
 	}
 }
 
@@ -45,6 +50,14 @@ func (l *Limiter) Allow(key string) (ok bool, retryAfter time.Duration) {
 	l.gc(now)
 	b, found := l.buckets[key]
 	if !found {
+		if len(l.buckets) >= l.maxKeys {
+			// Over the cap: drop an arbitrary entry (Go randomizes map iteration) to make room. Evicting a
+			// legitimate client only resets its bucket; refusing new keys would lock real users out instead.
+			for k := range l.buckets {
+				delete(l.buckets, k)
+				break
+			}
+		}
 		b = &bucket{tokens: l.burst, last: now}
 		l.buckets[key] = b
 	}
