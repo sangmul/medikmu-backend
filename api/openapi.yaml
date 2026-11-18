@@ -17,6 +17,8 @@ tags:
   - name: auth
   - name: me
   - name: patients
+  - name: facilities
+  - name: team
 paths:
   /auth/register:
     post:
@@ -298,6 +300,246 @@ paths:
           $ref: "#/components/responses/Error"
         "404":
           $ref: "#/components/responses/Error"
+  /facilities:
+    post:
+      tags: [facilities]
+      operationId: createFacility
+      summary: Create a facility; the caller becomes its admin
+      description: |
+        Any signed-in account can start a solo practice, clinic or hospital. No active facility is needed.
+        Afterwards call `/auth/switch-facility` with the new `id` to work inside it.
+        An account may create at most 5 facilities (`facility_limit`, 409).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FacilityCreateRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Facility"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /facilities/current:
+    get:
+      tags: [facilities]
+      operationId: getCurrentFacility
+      summary: The active facility (any staff role)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The facility
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Facility"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [facilities]
+      operationId: updateCurrentFacility
+      summary: Edit the facility profile (admin only; kind cannot change)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FacilityUpdateRequest"
+      responses:
+        "200":
+          description: Updated facility
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Facility"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /team:
+    get:
+      tags: [team]
+      operationId: listTeam
+      summary: Staff of the active facility (admin only; exposes emails)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Members
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Member"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+  /team/{userId}:
+    delete:
+      tags: [team]
+      operationId: removeMember
+      summary: Remove a staff member (admin only)
+      description: |
+        The last admin cannot be removed (`last_admin`, 409). The member's existing access token stays valid
+        until it expires (15 min) but cannot be refreshed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Removed
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /invites:
+    get:
+      tags: [team]
+      operationId: listInvites
+      summary: Pending invites (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Invites that are not accepted, revoked or expired. Tokens are never listed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Invite"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [team]
+      operationId: createInvite
+      summary: Invite someone to the facility (admin only)
+      description: |
+        Valid for 7 days. No email is sent: the response carries a one-time `token` that the admin shares with the
+        invitee. Only its hash is stored. One pending invite per email (`invite_pending`, 409);
+        inviting an existing member gives `already_member` (409).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatedInvite"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+  /invites/{id}:
+    delete:
+      tags: [team]
+      operationId: revokeInvite
+      summary: Cancel a pending invite (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Revoked
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /invites/accept:
+    post:
+      tags: [team]
+      operationId: acceptInvite
+      summary: Join a facility with an invite token
+      description: |
+        The signed-in account's email must match the invite's email. Every failure (unknown, used, revoked,
+        expired, other email) returns the same `invite_invalid` (400) so tokens cannot be probed.
+        Afterwards call `/auth/switch-facility` with the returned `facility_id`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [facility_id, role]
+                properties:
+                  facility_id: { type: string, format: uuid }
+                  role: { $ref: "#/components/schemas/Role" }
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Already a member (`already_member`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
 components:
   securitySchemes:
     bearerAuth:
@@ -381,6 +623,65 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Membership"
+    Role:
+      type: string
+      enum: [admin, doctor, nurse, pharmacist, finance, staff]
+    FacilityUpdateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 3, maxLength: 120 }
+        phone: { type: string }
+        address: { type: string, maxLength: 300 }
+    FacilityCreateRequest:
+      allOf:
+        - $ref: "#/components/schemas/FacilityUpdateRequest"
+        - type: object
+          required: [kind]
+          properties:
+            kind: { type: string, enum: [solo_doctor, clinic, hospital] }
+    Facility:
+      type: object
+      required: [id, name, kind, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        kind: { type: string, enum: [solo_doctor, clinic, hospital] }
+        phone: { type: string }
+        address: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Member:
+      type: object
+      required: [user_id, full_name, email, role, joined_at]
+      properties:
+        user_id: { type: string, format: uuid }
+        full_name: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/Role" }
+        joined_at: { type: string, format: date-time }
+    InviteRequest:
+      type: object
+      required: [email, role]
+      properties:
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/Role" }
+    Invite:
+      type: object
+      required: [id, email, role, expires_at, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/Role" }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+    CreatedInvite:
+      allOf:
+        - $ref: "#/components/schemas/Invite"
+        - type: object
+          required: [token]
+          properties:
+            token: { type: string, description: Shown once; share it with the invitee }
     PatientInput:
       type: object
       required: [full_name, sex, birth_date, phone, payment_type]

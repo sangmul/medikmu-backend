@@ -242,6 +242,29 @@ func TestSwitchFacility(t *testing.T) {
 	}
 }
 
+// A staff member removed from a facility keeps a valid access token until it expires (at most AccessTTL),
+// but can no longer renew it: refreshing re-checks the membership. See docs/security-compliance.md.
+func TestRefresh_AfterMembershipRemovedIsRefused(t *testing.T) {
+	svc, st := newSvc(t)
+	pair := register(t, svc, "dokter@example.com")
+	p, _ := svc.VerifyAccessToken(pair.AccessToken)
+	st.AddMembership(p.UserID, "fac-1", domain.RoleDoctor)
+	ctx := context.Background()
+
+	scoped, err := svc.SwitchFacility(ctx, p.UserID, pair.RefreshToken, "fac-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.RemoveMembership(p.UserID, "fac-1")
+
+	if _, err := svc.VerifyAccessToken(scoped.AccessToken); err != nil {
+		t.Fatalf("existing access token stays valid until it expires (documented limit): %v", err)
+	}
+	if _, err := svc.Refresh(ctx, scoped.RefreshToken); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("refresh after removal: want ErrForbidden, got %v", err)
+	}
+}
+
 func TestVerifyAccessToken_Rejects(t *testing.T) {
 	svc, _ := newSvc(t)
 	pair := register(t, svc, "budi@example.com")

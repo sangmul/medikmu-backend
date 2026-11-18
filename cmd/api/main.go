@@ -15,6 +15,9 @@ import (
 	authhttp "github.com/sangmul/medikmu-backend/internal/auth/http"
 	authservice "github.com/sangmul/medikmu-backend/internal/auth/service"
 	authstore "github.com/sangmul/medikmu-backend/internal/auth/store"
+	facilitieshttp "github.com/sangmul/medikmu-backend/internal/facilities/http"
+	facilitiesservice "github.com/sangmul/medikmu-backend/internal/facilities/service"
+	facilitiesstore "github.com/sangmul/medikmu-backend/internal/facilities/store"
 	patientshttp "github.com/sangmul/medikmu-backend/internal/patients/http"
 	patientsservice "github.com/sangmul/medikmu-backend/internal/patients/service"
 	patientsstore "github.com/sangmul/medikmu-backend/internal/patients/store"
@@ -62,11 +65,16 @@ func run() error {
 	// Credential endpoints: 20 requests/minute per client IP on average, bursts of 10.
 	authLimiter := httpx.NewLimiter(20, 10)
 
+	auditor := audit.NewPostgres(pool)
 	mounts := []httpx.Mount{
 		httpx.Readyz(pool.Ping),
+		facilitieshttp.New(
+			facilitiesservice.New(facilitiesstore.New(pool), auditor),
+			authSvc.VerifyAccessToken,
+		).Mount,
 		authhttp.New(authSvc, authhttp.WithRateLimit(authLimiter.Middleware(cfg.TrustProxy))).Mount,
 		patientshttp.New(
-			patientsservice.New(patientsstore.New(pool), audit.NewPostgres(pool)),
+			patientsservice.New(patientsstore.New(pool), auditor),
 			authSvc.VerifyAccessToken,
 		).Mount,
 	}

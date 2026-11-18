@@ -7,7 +7,8 @@ All under `/api/v1`. Status: ☐ todo, ☑ in `api/openapi.yaml`. Derived from `
 - ☐ `POST /auth/forgot-password`, `/auth/verify-otp` (need an email/SMS/WhatsApp provider), login rate limiting (Redis), invite acceptance (staff onboarding)
 - ☐ `POST /files` (signed upload), `GET /files/{id}`
 - ☐ `POST /devices` (FCM token), `GET /notifications`
-- ☐ `GET|PUT /facilities/current`, `/team`, `/invites`
+- ☑ Facilities and team (implemented: `internal/facilities`): `POST /facilities`, `GET|PUT /facilities/current`, `GET /team`, `DELETE /team/{userId}`, `GET|POST /invites`, `DELETE /invites/{id}`, `POST /invites/accept`
+- ☐ Team later: change a member's role, leave a facility, resend/expire invites by email (needs an email provider), facility logo/settings
 
 ## Phase 2 — Core care
 - ☑ Patients (implemented: `internal/patients`): `GET|POST /patients`, `GET|PUT|DELETE /patients/{id}` (DELETE archives, admin only)
