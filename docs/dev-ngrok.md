@@ -25,7 +25,7 @@ mobile / web ──HTTPS──> https://<name>.ngrok-free.app ──ngrok──>
 ## Run it
 Everything in Docker (recommended, same machine runs API and tunnel):
 ```bash
-make tunnel          # API + Postgres + Redis + MinIO + ngrok; migrations run automatically
+make tunnel          # API + Postgres + Redis + ngrok; migrations run automatically
 curl https://<name>.ngrok-free.app/healthz
 open https://<name>.ngrok-free.app/docs      # interactive API docs (non-production only)
 ```

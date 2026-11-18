@@ -5,7 +5,7 @@ DB_URL ?= postgres://medikmu:medikmu@localhost:5432/medikmu?sslmode=disable
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-up: ## Start API + Postgres + Redis + MinIO (hot reload)
+up: ## Start API + Postgres + Redis (hot reload, auto-migrate)
 	@test -f .env || cp .env.example .env
 	docker compose up --build
 

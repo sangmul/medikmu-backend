@@ -17,7 +17,6 @@ make test
 | API | http://localhost:8080 |
 | Postgres | localhost:5432 (`medikmu` / `medikmu`) |
 | Redis | localhost:6379 |
-| MinIO console | http://localhost:9001 (`minioadmin` / `minioadmin`) |
 | API docs (Swagger UI) | http://localhost:8080/docs |
 
 Migrations run automatically on `make up`. To run them by hand against the compose database, use `make migrate-up`
