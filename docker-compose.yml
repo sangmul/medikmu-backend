@@ -50,7 +50,7 @@ services:
       POSTGRES_PASSWORD: medikmu
       POSTGRES_DB: medikmu
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432" # localhost only: the password is a known dev value
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -62,7 +62,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379" # localhost only: Redis has no password in dev
 
   # Object storage (lab files, PDFs) is not here yet: no module uses it. MinIO was removed because its images
   # are no longer pullable (minio/minio on Docker Hub and quay.io/minio/minio both refuse anonymous pulls).

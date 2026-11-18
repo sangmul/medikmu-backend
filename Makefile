@@ -5,12 +5,18 @@ DB_URL ?= postgres://medikmu:medikmu@localhost:5432/medikmu?sslmode=disable
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-up: ## Start API + Postgres + Redis (hot reload, auto-migrate)
-	@test -f .env || cp .env.example .env
+# A new .env gets its own random JWT_SECRET: the placeholder in .env.example is public, so anyone could
+# forge tokens against an API that uses it (and `make tunnel` makes the API public).
+.env:
+	cp .env.example .env
+	@secret=$$(openssl rand -hex 32) && sed -i.bak "s|^JWT_SECRET=.*|JWT_SECRET=$$secret|" .env && rm -f .env.bak
+	@echo "Created .env with a random JWT_SECRET"
+
+up: .env ## Start API + Postgres + Redis (hot reload, auto-migrate)
 	docker compose up --build
 
-tunnel: ## Start the stack plus an ngrok tunnel (needs NGROK_AUTHTOKEN, NGROK_DOMAIN in .env)
-	@test -f .env || cp .env.example .env
+tunnel: .env ## Start the stack plus an ngrok tunnel (needs NGROK_AUTHTOKEN, NGROK_DOMAIN in .env)
+	@! grep -Eqi '^JWT_SECRET=(dev-only|change-me)' .env || { echo "JWT_SECRET in .env is the public placeholder. Run: openssl rand -hex 32, and put it in .env"; exit 1; }
 	@grep -Eq '^NGROK_AUTHTOKEN=.+' .env || { echo "Set NGROK_AUTHTOKEN in .env (see docs/dev-ngrok.md)"; exit 1; }
 	@grep -Eq '^NGROK_DOMAIN=.+' .env || { echo "Set NGROK_DOMAIN in .env (see docs/dev-ngrok.md)"; exit 1; }
 	docker compose --profile tunnel up --build
