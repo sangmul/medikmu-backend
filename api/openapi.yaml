@@ -8,6 +8,11 @@ info:
 servers:
   - url: http://localhost:8080/api/v1
     description: Local development
+  - url: https://{domain}/api/v1
+    description: Development tunnel (ngrok); see docs/dev-ngrok.md
+    variables:
+      domain:
+        default: your-name.ngrok-free.app
 tags:
   - name: auth
   - name: me

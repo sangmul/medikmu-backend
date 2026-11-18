@@ -2,6 +2,7 @@
 package httpx
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -15,7 +16,7 @@ import (
 type Mount func(mux *http.ServeMux)
 
 // NewRouter builds the root handler and mounts each module's routes.
-func NewRouter(_ config.Config, mounts ...Mount) http.Handler {
+func NewRouter(cfg config.Config, mounts ...Mount) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -25,7 +26,25 @@ func NewRouter(_ config.Config, mounts ...Mount) http.Handler {
 		m(mux)
 	}
 
-	return chain(mux, recoverer, requestLogger)
+	// CORS sits next to the mux so it can answer preflight (OPTIONS) requests the mux would reject with 405.
+	return chain(mux, recoverer, requestLogger, CORS(cfg.CORSAllowedOrigins))
+}
+
+// Readyz mounts GET /readyz: 200 when check passes (e.g. a database ping), 503 otherwise.
+// /healthz only says the process is up; /readyz says it can serve traffic.
+func Readyz(check func(context.Context) error) Mount {
+	return func(mux *http.ServeMux) {
+		mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+			if err := check(ctx); err != nil {
+				slog.Error("readiness check failed", "error", err)
+				JSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+				return
+			}
+			JSON(w, http.StatusOK, map[string]string{"status": "ready"})
+		})
+	}
 }
 
 // maxBodyBytes caps JSON request bodies.

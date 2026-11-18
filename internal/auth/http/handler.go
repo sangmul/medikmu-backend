@@ -26,17 +26,38 @@ type Auth interface {
 
 // Handler serves the auth endpoints.
 type Handler struct {
-	auth Auth
+	auth  Auth
+	limit func(http.Handler) http.Handler // applied to credential-guessing endpoints; nil = none
+}
+
+// Option customizes a Handler.
+type Option func(*Handler)
+
+// WithRateLimit wraps login, register and refresh (the endpoints attackers hammer) in mw.
+func WithRateLimit(mw func(http.Handler) http.Handler) Option {
+	return func(h *Handler) { h.limit = mw }
 }
 
 // New returns a Handler.
-func New(a Auth) *Handler { return &Handler{auth: a} }
+func New(a Auth, opts ...Option) *Handler {
+	h := &Handler{auth: a}
+	for _, o := range opts {
+		o(h)
+	}
+	return h
+}
 
 // Mount registers the auth routes.
 func (h *Handler) Mount(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v1/auth/register", h.register)
-	mux.HandleFunc("POST /api/v1/auth/login", h.login)
-	mux.HandleFunc("POST /api/v1/auth/refresh", h.refresh)
+	limited := func(f http.HandlerFunc) http.Handler {
+		if h.limit == nil {
+			return f
+		}
+		return h.limit(f)
+	}
+	mux.Handle("POST /api/v1/auth/register", limited(h.register))
+	mux.Handle("POST /api/v1/auth/login", limited(h.login))
+	mux.Handle("POST /api/v1/auth/refresh", limited(h.refresh))
 	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
 
 	protected := httpx.RequireAuth(h.auth.VerifyAccessToken)

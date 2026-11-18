@@ -171,6 +171,44 @@ func TestLogin_WrongPasswordAndUnknownUserLookIdentical(t *testing.T) {
 	}
 }
 
+func TestRateLimit_CredentialEndpointsOnly(t *testing.T) {
+	st := authtest.NewMemStore()
+	svc, err := service.New(st, service.Config{
+		JWTSecret: []byte("test-secret-test-secret-test-secret-123"),
+		AccessTTL: 15 * time.Minute, RefreshTTL: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	limiter := httpx.NewLimiter(1, 3) // burst of 3, then ~1/minute
+	h := authhttp.New(svc, authhttp.WithRateLimit(limiter.Middleware(true)))
+	e := &env{srv: httpx.NewRouter(config.Config{}, h.Mount), store: st, svc: svc}
+
+	login := func(ip string) int {
+		req := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"email":"x@y.co","password":"wrong-password"}`))
+		req.Header.Set("X-Forwarded-For", "6.6.6.6, "+ip) // left entry is attacker-controlled and ignored
+		rec := httptest.NewRecorder()
+		e.srv.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	for i := range 3 {
+		if code := login("203.0.113.1"); code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: want 401 (invalid creds), got %d", i, code)
+		}
+	}
+	if code := login("203.0.113.1"); code != http.StatusTooManyRequests {
+		t.Fatalf("4th attempt: want 429, got %d", code)
+	}
+	if code := login("203.0.113.2"); code != http.StatusUnauthorized {
+		t.Fatalf("a different client IP must not be limited, got %d", code)
+	}
+	// Logout and /me are not credential-guessing endpoints and are not limited.
+	rec := e.do(t, "POST", "/api/v1/auth/logout", "", `{"refresh_token":"x"}`)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("logout: %d", rec.Code)
+	}
+}
+
 func TestProtectedRoutes_RequireValidBearer(t *testing.T) {
 	e := newEnv(t)
 	for name, token := range map[string]string{"none": "", "garbage": "abc.def.ghi"} {

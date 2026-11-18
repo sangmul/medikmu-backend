@@ -1,6 +1,6 @@
 # ADR 0003: Start on a single VPS with Docker Compose
 
-- Status: proposed (target provider not yet chosen)
+- Status: proposed (target provider not yet chosen). For the development period the API is exposed with ngrok instead; see [0004](0004-dev-via-ngrok.md). This ADR now covers production hosting only.
 - Date: 2026-11-17
 
 ## Context
