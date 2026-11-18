@@ -8,16 +8,31 @@ Electronic medical records (Rekam Medis Elektronik) are also regulated by the Mi
 may need to integrate with **SatuSehat**. The web app already models these areas under `features/compliance`.
 
 ## Engineering baseline
-- HTTPS everywhere (Caddy, automatic certificates). HSTS on.
-- Passwords hashed with argon2id/bcrypt; rate-limit login and OTP; lockout with backoff.
-- Short-lived access tokens, rotating hashed refresh tokens, revoke on password change.
-- Authorization (role + facility) enforced in the service layer. Tenant isolation tested.
-- Audit log for every read/write of patient data (`audit_logs`); retained and tamper-resistant (append-only).
-- Encrypt at rest: disk encryption on the VPS, encrypted backups; files stored with private ACLs and signed URLs.
-- No PII, tokens or medical content in logs or error reports.
-- Secrets only in env/secret store; rotate on staff changes.
-- Backups tested by restoring them, regularly.
-- Dependency and image scanning in CI (`govulncheck`, Dependabot).
+
+### Implemented (each is covered by a test unless noted)
+- Passwords hashed with argon2id; login does not reveal whether an email exists (same error, equalized timing).
+- Short-lived access JWTs (HS256; algorithm, issuer and expiry enforced; `alg=none` rejected) and rotating opaque refresh
+  tokens stored only as SHA-256 hashes. Reusing an already-used refresh token revokes the whole session.
+- Authorization (role + facility, or account ownership) enforced in the service layer; tenant isolation tested at the service,
+  HTTP and Postgres levels. Another tenant's data is a 404, never a 403.
+- Audit log for patient reads and writes and for facility/team/invite changes (`audit_logs`); reads of patient data are
+  fail-closed. Audit entries contain IDs only, never names, emails, search text or tokens.
+- Invite tokens: 256-bit, one-time, stored hashed, 7-day expiry, bound to the invited email, atomic single use, and every
+  failure looks the same.
+- Rate limiting of login, register and refresh per client IP (in-memory; see limitations).
+- Exact-origin CORS; request bodies capped at 1 MiB; unknown JSON fields rejected (no mass assignment); parameterized SQL only.
+- Responses with personal data or tokens are `Cache-Control: no-store`; NIK is masked in lists.
+- The public placeholder `JWT_SECRET` is refused outside plain local development; `make .env` generates a random one (not covered by a Go test).
+- Postgres and Redis ports bind to `127.0.0.1` in the dev stack (verified by reading `docker-compose.yml`, not by a test).
+
+### Planned (not done yet; do not assume they exist)
+- **Per-account login lockout or backoff.** Only per-IP limiting exists, so credential stuffing across many IPs is not slowed down.
+- **HTTPS and HSTS.** Production Caddy terminates TLS but HSTS is not configured; ngrok terminates TLS in development.
+- **Revoke sessions on password change** (there is no password change or reset endpoint yet).
+- **Tamper-resistant audit log** (append-only enforced by the database) and retention rules.
+- **Encryption at rest** (disk encryption, encrypted backups) and **tested restores** (`deploy/backup.sh` is written but never run against a real backup target).
+- **Dependency and image scanning in CI** (`govulncheck`, Dependabot): CI currently runs vet, tests, lint, OpenAPI lint and a Docker build only.
+- Secret rotation process; error tracking that scrubs PII.
 
 ## Known limitations (accepted for now)
 - **Removed staff keep access for up to 15 minutes.** Access tokens are stateless JWTs: removing someone from a

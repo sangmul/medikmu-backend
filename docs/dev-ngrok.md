@@ -12,20 +12,22 @@ mobile / web ──HTTPS──> https://<name>.ngrok-free.app ──ngrok──>
 1. Create a free ngrok account and copy your **authtoken** (dashboard → Getting started → Your Authtoken).
 2. Reserve a **static domain** (dashboard → Domains). Free accounts get one; it keeps the URL stable, so the apps do not
    need a new base URL every day.
-3. `cp .env.example .env`, then set in `.env`:
+3. Run `make .env` (also done by `make up` and `make tunnel`). It copies `.env.example` and gives the new file its **own random
+   `JWT_SECRET`**: the placeholder in `.env.example` is public, so anyone could forge tokens against an API that used it.
+   Then set in `.env`:
    ```
    NGROK_AUTHTOKEN=<token>
    NGROK_DOMAIN=<name>.ngrok-free.app
    TRUST_PROXY=true
    CORS_ALLOWED_ORIGINS=http://localhost:5173,https://<web-dev-origin>
-   JWT_SECRET=<openssl rand -hex 32>
    ```
-   `.env` is git-ignored. Never commit the authtoken.
+   `.env` is git-ignored. Never commit the authtoken. If an older `.env` still has the placeholder secret, `make tunnel` refuses to
+   start, and the API refuses to boot with it when `TRUST_PROXY=true` or `APP_ENV` is not `development`.
 
 ## Run it
 Everything in Docker (recommended, same machine runs API and tunnel):
 ```bash
-make tunnel          # API + Postgres + Redis + MinIO + ngrok; migrations run automatically
+make tunnel          # API + Postgres + Redis + ngrok; migrations run automatically
 curl https://<name>.ngrok-free.app/healthz
 open https://<name>.ngrok-free.app/docs      # interactive API docs (non-production only)
 ```
@@ -53,6 +55,10 @@ the tunnel device to reach port 8080, and set `TRUST_PROXY=true` on the API.
 ## Things to know
 - **Anyone with the URL can reach the API.** Only use fake data. Do not enter real patient data while developing on ngrok.
   Rate limiting (20/min per client IP on login, register and refresh) and JWT auth still apply.
+- **Network exposure.** Postgres (5432) and Redis (6379) are published on `127.0.0.1` only. The API port 8080 is published on all
+  interfaces so a separate tunnel device can reach it. With `TRUST_PROXY=true` the client IP is read from `X-Forwarded-For`,
+  which anyone who can reach port 8080 directly can forge: keep 8080 reachable only from the tunnel host (firewall), or run ngrok
+  on the same machine through `make tunnel`.
 - **Free-tier limits** (bandwidth, one static domain, interstitial) are fine for development, not for a pilot with real clinics.
 - The URL changes if you do not use a static domain; the apps then need the new base URL.
 - `/docs` and `/openapi.yaml` are served only when `APP_ENV` is not `production`.

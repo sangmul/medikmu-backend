@@ -64,11 +64,31 @@ func (p *Postgres) UserByID(ctx context.Context, id string) (domain.User, error)
 	return p.scanUser(p.pool.QueryRow(ctx, userSelect+` WHERE id = $1`, id))
 }
 
-const userSelect = `SELECT id, email, COALESCE(phone, ''), password_hash, full_name, created_at FROM users`
+const userSelect = `SELECT id, email, COALESCE(phone, ''), (phone_verified_at IS NOT NULL), password_hash, full_name, created_at FROM users`
+
+// UpdateProfile changes the name and phone. Changing the phone clears its verification.
+func (p *Postgres) UpdateProfile(ctx context.Context, userID, fullName, phone string) (domain.User, error) {
+	var phoneArg *string
+	if phone != "" {
+		phoneArg = &phone
+	}
+	u, err := p.scanUser(p.pool.QueryRow(ctx, `
+		UPDATE users SET full_name = $2,
+			phone_verified_at = CASE WHEN phone IS DISTINCT FROM $3 THEN NULL ELSE phone_verified_at END,
+			phone = $3
+		WHERE id = $1
+		RETURNING id, email, COALESCE(phone, ''), (phone_verified_at IS NOT NULL), password_hash, full_name, created_at`,
+		userID, fullName, phoneArg))
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation && pgErr.ConstraintName == phoneConstraint {
+		return domain.User{}, domain.ErrPhoneTaken
+	}
+	return u, err
+}
 
 func (p *Postgres) scanUser(row pgx.Row) (domain.User, error) {
 	var u domain.User
-	err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.PasswordHash, &u.FullName, &u.CreatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.Phone, &u.PhoneVerified, &u.PasswordHash, &u.FullName, &u.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.User{}, domain.ErrNotFound
 	}

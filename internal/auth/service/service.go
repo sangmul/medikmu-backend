@@ -72,6 +72,10 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (domain.TokenP
 	if name == "" || utf8.RuneCountInString(name) > 120 {
 		fields["full_name"] = "nama wajib diisi (maksimal 120 karakter)"
 	}
+	phone, msg := normalizePhone(in.Phone)
+	if msg != "" {
+		fields["phone"] = msg
+	}
 	if len(fields) > 0 {
 		return domain.TokenPair{}, &domain.ValidationError{Fields: fields}
 	}
@@ -82,7 +86,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (domain.TokenP
 	}
 	user, err := s.store.CreateUser(ctx, domain.User{
 		Email:        email,
-		Phone:        strings.TrimSpace(in.Phone),
+		Phone:        phone,
 		PasswordHash: hash,
 		FullName:     name,
 	})
@@ -179,6 +183,24 @@ func (s *Service) Me(ctx context.Context, userID string) (domain.Me, error) {
 	return domain.Me{User: user, Memberships: memberships}, nil
 }
 
+// UpdateProfile changes the caller's display name and phone. An empty phone clears it; changing the phone
+// resets its verification.
+func (s *Service) UpdateProfile(ctx context.Context, userID, fullName, phone string) (domain.User, error) {
+	fields := map[string]string{}
+	name := strings.TrimSpace(fullName)
+	if name == "" || utf8.RuneCountInString(name) > 120 {
+		fields["full_name"] = "nama wajib diisi (maksimal 120 karakter)"
+	}
+	phone, msg := normalizePhone(phone)
+	if msg != "" {
+		fields["phone"] = msg
+	}
+	if len(fields) > 0 {
+		return domain.User{}, &domain.ValidationError{Fields: fields}
+	}
+	return s.store.UpdateProfile(ctx, userID, name, phone)
+}
+
 // consume validates a refresh token and marks it used. On reuse it revokes the family.
 func (s *Service) consume(ctx context.Context, token string, now time.Time) (domain.RefreshToken, error) {
 	if token == "" {
@@ -263,3 +285,25 @@ func (s *Service) roleIn(ctx context.Context, userID, facilityID string) (string
 }
 
 func normalizeEmail(e string) string { return strings.ToLower(strings.TrimSpace(e)) }
+
+// normalizePhone keeps digits (and a leading +) so "0812-3456-7890" and "081234567890" are the same number.
+// An empty phone is valid (it is optional). The message is non-empty when the number is unusable.
+func normalizePhone(phone string) (normalized, msg string) {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return "", ""
+	}
+	digits := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, phone)
+	if len(digits) < 9 || len(digits) > 15 {
+		return "", "nomor telepon harus 9-15 digit"
+	}
+	if strings.HasPrefix(phone, "+") {
+		return "+" + digits, ""
+	}
+	return digits, ""
+}

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/sangmul/medikmu-backend/internal/patients/domain"
 	"github.com/sangmul/medikmu-backend/internal/patients/patientstest"
@@ -329,6 +331,34 @@ func TestList_PaginationAndSearch(t *testing.T) {
 	page, _ = e.svc.List(ctx, p, "RM-000003", nil, 10)
 	if len(page.Patients) != 1 || page.Patients[0].FullName != "Citra Dewi" {
 		t.Fatalf("search MRN: %+v", page.Patients)
+	}
+}
+
+// spyStore records the filter the service hands to the store.
+type spyStore struct {
+	*patientstest.MemStore
+	got domain.ListFilter
+}
+
+func (s *spyStore) List(ctx context.Context, facilityID string, f domain.ListFilter) ([]domain.Patient, error) {
+	s.got = f
+	return s.MemStore.List(ctx, facilityID, f)
+}
+
+func TestList_SearchTextIsTrimmedAndCapped(t *testing.T) {
+	spy := &spyStore{MemStore: patientstest.NewMemStore()}
+	svc := service.New(spy, &audit.Memory{})
+	ctx, p := context.Background(), who(facA, "doctor")
+
+	if _, err := svc.List(ctx, p, "   siti   ", nil, 10); err != nil || spy.got.Query != "siti" {
+		t.Fatalf("query must be trimmed: %v %q", err, spy.got.Query)
+	}
+	long := strings.Repeat("é", 5000) // multi-byte runes: must be cut on rune boundaries, not bytes
+	if _, err := svc.List(ctx, p, long, nil, 10); err != nil {
+		t.Fatal(err)
+	}
+	if n := utf8.RuneCountInString(spy.got.Query); n != 100 || !utf8.ValidString(spy.got.Query) {
+		t.Fatalf("query must be capped at 100 valid runes, got %d (valid=%v)", n, utf8.ValidString(spy.got.Query))
 	}
 }
 

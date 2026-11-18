@@ -135,6 +135,29 @@ func TestFullFlow(t *testing.T) {
 	}
 }
 
+func TestProfile(t *testing.T) {
+	e := newEnv(t)
+	reg := decodePair(t, e.do(t, "POST", "/api/v1/auth/register", "", registerBody))
+
+	rec := e.do(t, "PUT", "/api/v1/me/profile", reg.AccessToken, `{"full_name":"Budi S.","phone":"0812-3456-7890"}`)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"phone":"081234567890"`) ||
+		!strings.Contains(rec.Body.String(), `"phone_verified":false`) || !strings.Contains(rec.Body.String(), `"full_name":"Budi S."`) {
+		t.Fatalf("update: %d %s", rec.Code, rec.Body)
+	}
+	if rec = e.do(t, "GET", "/api/v1/me", reg.AccessToken, ""); !strings.Contains(rec.Body.String(), `"phone":"081234567890"`) {
+		t.Fatalf("/me must reflect the update: %s", rec.Body)
+	}
+	if rec = e.do(t, "PUT", "/api/v1/me/profile", reg.AccessToken, `{"full_name":"","phone":"1"}`); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("invalid: %d %s", rec.Code, rec.Body)
+	}
+	if rec = e.do(t, "PUT", "/api/v1/me/profile", reg.AccessToken, `{"full_name":"X","email":"hijack@evil.test"}`); rec.Code != http.StatusBadRequest {
+		t.Fatalf("email is not editable here (unknown field): %d", rec.Code)
+	}
+	if rec = e.do(t, "PUT", "/api/v1/me/profile", "", `{"full_name":"X"}`); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("no token: %d", rec.Code)
+	}
+}
+
 func TestRegister_Errors(t *testing.T) {
 	e := newEnv(t)
 	e.do(t, "POST", "/api/v1/auth/register", "", registerBody)

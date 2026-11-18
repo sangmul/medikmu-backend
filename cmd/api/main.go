@@ -18,6 +18,9 @@ import (
 	facilitieshttp "github.com/sangmul/medikmu-backend/internal/facilities/http"
 	facilitiesservice "github.com/sangmul/medikmu-backend/internal/facilities/service"
 	facilitiesstore "github.com/sangmul/medikmu-backend/internal/facilities/store"
+	familyhttp "github.com/sangmul/medikmu-backend/internal/family/http"
+	familyservice "github.com/sangmul/medikmu-backend/internal/family/service"
+	familystore "github.com/sangmul/medikmu-backend/internal/family/store"
 	patientshttp "github.com/sangmul/medikmu-backend/internal/patients/http"
 	patientsservice "github.com/sangmul/medikmu-backend/internal/patients/service"
 	patientsstore "github.com/sangmul/medikmu-backend/internal/patients/store"
@@ -68,6 +71,7 @@ func run() error {
 	auditor := audit.NewPostgres(pool)
 	mounts := []httpx.Mount{
 		httpx.Readyz(pool.Ping),
+		familyhttp.New(familyservice.New(familystore.New(pool)), authSvc.VerifyAccessToken).Mount,
 		facilitieshttp.New(
 			facilitiesservice.New(facilitiesstore.New(pool), auditor),
 			authSvc.VerifyAccessToken,

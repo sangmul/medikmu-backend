@@ -17,7 +17,6 @@ make test
 | API | http://localhost:8080 |
 | Postgres | localhost:5432 (`medikmu` / `medikmu`) |
 | Redis | localhost:6379 |
-| MinIO console | http://localhost:9001 (`minioadmin` / `minioadmin`) |
 | API docs (Swagger UI) | http://localhost:8080/docs |
 
 Migrations run automatically on `make up`. To run them by hand against the compose database, use `make migrate-up`
@@ -38,8 +37,10 @@ docs/                 architecture, deployment, conventions, ADRs
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Client guide (mobile and web)](docs/client-guide.md)
 - [API conventions](docs/api-conventions.md)
 - [Endpoint roadmap](docs/endpoints-roadmap.md)
+- [Design: appointments and booking](docs/design/appointments.md) (proposal, needs decisions)
 - [Development with ngrok](docs/dev-ngrok.md)
 - [Deployment and cost](docs/deployment.md) (production, later)
 - [Security and compliance](docs/security-compliance.md)

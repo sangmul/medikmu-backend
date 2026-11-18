@@ -110,6 +110,28 @@ func (m *MemStore) UserByID(_ context.Context, id string) (domain.User, error) {
 	return domain.User{}, domain.ErrNotFound
 }
 
+func (m *MemStore) UpdateProfile(_ context.Context, userID, fullName, phone string) (domain.User, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	u, ok := m.users[userID]
+	if !ok {
+		return domain.User{}, domain.ErrNotFound
+	}
+	if phone != "" {
+		for id, e := range m.users {
+			if id != userID && e.Phone == phone {
+				return domain.User{}, domain.ErrPhoneTaken
+			}
+		}
+	}
+	if u.Phone != phone {
+		u.PhoneVerified = false
+	}
+	u.FullName, u.Phone = fullName, phone
+	m.users[userID] = u
+	return u, nil
+}
+
 func (m *MemStore) Memberships(_ context.Context, userID string) ([]domain.Membership, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

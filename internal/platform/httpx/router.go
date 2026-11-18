@@ -27,7 +27,18 @@ func NewRouter(cfg config.Config, mounts ...Mount) http.Handler {
 	}
 
 	// CORS sits next to the mux so it can answer preflight (OPTIONS) requests the mux would reject with 405.
-	return chain(mux, recoverer, requestLogger, CORS(cfg.CORSAllowedOrigins))
+	return chain(mux, recoverer, securityHeaders, requestLogger, CORS(cfg.CORSAllowedOrigins))
+}
+
+// securityHeaders sets headers that are safe for every response of a JSON API: browsers must not sniff
+// a JSON body into something executable, and URLs of this API must not leak through the Referer header.
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Readyz mounts GET /readyz: 200 when check passes (e.g. a database ping), 503 otherwise.

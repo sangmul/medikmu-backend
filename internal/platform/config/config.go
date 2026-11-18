@@ -69,7 +69,17 @@ func Load() (Config, error) {
 	if len(cfg.JWTSecret) < 32 {
 		return Config{}, fmt.Errorf("JWT_SECRET must be at least 32 characters (generate: openssl rand -hex 32)")
 	}
+	// The placeholder in .env.example is public. Anyone who can reach the API (production, staging, or a dev
+	// tunnel behind TRUST_PROXY) could forge tokens with it, so it is only accepted for plain local development.
+	if (cfg.Env != "development" || cfg.TrustProxy) && isPlaceholderSecret(cfg.JWTSecret) {
+		return Config{}, fmt.Errorf("JWT_SECRET is the public placeholder from .env.example; generate a real one: openssl rand -hex 32")
+	}
 	return cfg, nil
+}
+
+func isPlaceholderSecret(s string) bool {
+	s = strings.ToLower(s)
+	return strings.HasPrefix(s, "dev-only") || strings.HasPrefix(s, "change-me")
 }
 
 func get(key, fallback string) string {
